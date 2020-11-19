@@ -14,6 +14,7 @@ code.
 package main
 
 import (
+	"context"
 	"math/rand"
 	"os"
 	"strconv"
@@ -39,7 +40,7 @@ func main() {
 	// so that parallel modifications of the deployment don't cause our code
 	// to just fail but rather retry until it succeeded.
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		deployment, err := deploymentsClient.Get("whoami", metav1.GetOptions{})
+		deployment, err := deploymentsClient.Get(context.Background(), "whoami", metav1.GetOptions{})
 		if err != nil {
 			panic(err)
 		}
@@ -51,7 +52,7 @@ func main() {
 			}
 		}
 
-		_, err = deploymentsClient.Update(deployment)
+		_, err = deploymentsClient.Update(context.Background(), deployment, metav1.UpdateOptions{})
 		return err
 	})
 

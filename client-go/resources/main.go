@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -33,7 +34,7 @@ func main() {
 		Resource("roles").
 		Namespace("default").
 		Body(&newRole).
-		Do().
+		Do(context.Background()).
 		Into(&res); err != nil {
 		panic(err)
 	}

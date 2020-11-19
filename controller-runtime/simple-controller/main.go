@@ -26,6 +26,10 @@ func (r Reconciler) Reconcile(req reconcile.Request) (reconcile.Result, error) {
 	if err := r.client.Get(ctx, req.NamespacedName, &pod); err != nil {
 		return reconcile.Result{}, err
 	}
+	pod.Labels["makk.es/manager"] = "k8s-examples"
+	if err := r.client.Update(ctx, &pod); err != nil {
+		return reconcile.Result{}, err
+	}
 	fmt.Printf("reconciled pod %s/%s (%s)\n", pod.GetNamespace(), pod.GetName(), pod.GetCreationTimestamp())
 	return reconcile.Result{}, nil
 }
