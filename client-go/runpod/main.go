@@ -1,28 +1,22 @@
 package main
 
 import (
+	"path"
 	"context"
 	"fmt"
 	"os"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/wait"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func main() {
-	config, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
-	if err != nil {
-		panic(err)
-	}
-	clientset := kubernetes.NewForConfigOrDie(config)
-	podClient := clientset.CoreV1().Pods("default")
-	pod, err := podClient.Create(context.Background(), &corev1.Pod{
+func curl(c typedcorev1.PodInterface, url string) (string, error) {
+	pod, err := c.Create(context.Background(), &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "debug",
 		},
@@ -34,29 +28,54 @@ func main() {
 				Args: []string{
 					"curl",
 					"-sk",
-					"https://kubernetes/version",
+					url,
 				},
 			}},
 		},
 	}, metav1.CreateOptions{})
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("could not create pod: %w", err)
 	}
 
 	defer func() {
-		podClient.Delete(context.Background(), "debug", metav1.DeleteOptions{})
+		c.Delete(context.Background(), "debug", metav1.DeleteOptions{})
 	}()
 
-	wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 		var err error
-		pod, err = podClient.Get(context.Background(), "debug", metav1.GetOptions{})
+		pod, err = c.Get(context.Background(), "debug", metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		return pod.Status.Phase == corev1.PodSucceeded, nil
 	})
+	err != nil{
+		return "", fmt.Errorf("could not verify pod is running: %w", err)
+	}
 
-	res, err := podClient.GetLogs("debug", &corev1.PodLogOptions{}).Do(context.Background()).Raw()
+	res, err := c.GetLogs("debug", &corev1.PodLogOptions{}).Do(context.Background()).Raw()
+	if err != nil {
+		return "", fmt.Errorf("could not get pod logs: %w", err)
+	}
+	return string(res), nil
+}
+
+func main() {
+	kubeconfig := os.Getenv("KUBECONFIG")
+	if kubeconfig == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			panic(err)
+		}
+		kubeconfig = path.Join(homeDir, ".kube", "config")
+	}
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		panic(err)
+	}
+	clientset := kubernetes.NewForConfigOrDie(config)
+	podClient := clientset.CoreV1().Pods("default")
+	res, err := curl(podClient, "https://kubernetes/version")
 	if err != nil {
 		panic(err)
 	}
