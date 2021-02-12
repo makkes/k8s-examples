@@ -1,0 +1,67 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: post-install-job
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: post-install-job
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: post-install-job
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: post-install-job
+subjects:
+  - kind: ServiceAccount
+    name: post-install-job
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: purger-script
+data:
+  test.sh: |
+    #!/bin/bash
+    for cm in $(kubectl get cm -o jsonpath='{.items[*].metadata.name}') ; do
+      kubectl patch cm ${cm} --type json -p '[{"op":"remove", "path":"/metadata/finalizers"}]'
+    done
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kubectl
+spec:
+  restartPolicy: Never
+  serviceAccount: post-install-job
+  containers:
+  - name: kubectl
+    image: "bitnami/kubectl:latest"
+    volumeMounts:
+      - name: purger-script
+        mountPath: /test.sh
+        subPath: test.sh
+        readOnly: true
+    command:
+      - "/test.sh"
+  volumes:
+    - name: purger-script
+      configMap:
+        name: purger-script
+        defaultMode: 0777

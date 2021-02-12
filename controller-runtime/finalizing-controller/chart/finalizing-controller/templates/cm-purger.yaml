@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: purger-script
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "-2"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+  purge.sh: |
+    #!/bin/bash
+    echo "CMs:"
+    kubectl -n {{.Release.Namespace}} get cm -o jsonpath='{.items[*].metadata.name}' -l "app.kubernetes.io/managed-by=Helm"
+    for cm in $(kubectl -n {{.Release.Namespace}} get cm -o jsonpath='{.items[*].metadata.name}' -l "app.kubernetes.io/managed-by=Helm") ; do
+      if [[ "$(kubectl -n {{.Release.Namespace}} get cm ${cm} -o jsonpath='{.metadata.annotations.meta\.helm\.sh/release-name}')" == "{{.Release.Name}}" ]] ; then
+        kubectl -n {{.Release.Namespace}} delete cm ${cm}
+      fi
+    done

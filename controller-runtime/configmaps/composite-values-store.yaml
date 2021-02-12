@@ -1,0 +1,33 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: max1
+  namespace: default
+  annotations:
+    kubeaddons.d2iq.com/priority: "50"
+  labels:
+    app.kubernetes.io/name: kubeaddons
+    app.kubernetes.io/component: controller
+data:
+  values: |
+    heartbeat:
+      image:
+        version: "3.0"
+        repo: "a/b"
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: max2
+  namespace: default
+  annotations:
+    kubeaddons.d2iq.com/priority: "60"
+  labels:
+    app.kubernetes.io/name: kubeaddons
+    app.kubernetes.io/component: controller
+data:
+  values: |
+    heartbeat:
+      image:
+        version: "4.0"
